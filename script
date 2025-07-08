@@ -1,0 +1,219 @@
+// C++ code
+//Mouse Maze Solver -- Sam Lewis
+
+//step counter
+int i;
+//bad step counter
+int j;
+//current position (x,y)
+int currentPos[2]={0,0};
+//attempted position (x,y)
+int nextPos[2]={0,0};
+//designated start
+int startPos[2]={4,0};
+//maze end
+int endPos[2]={4,7};
+//movement placeholder
+int rMove;
+//input for setting start/end coords
+int startNend;
+//effieciency checker
+float eff;
+
+//by defining char as a pointer, an array of array of strings can be created
+//these new character arrays can be called by index
+//https://docs.arduino.cc/language-reference/en/variables/data-types/string/
+
+char* directions[]={"North","East","South","West"};
+
+//function to see if the attempted move runs into a wall
+//returns of false mean a collision
+bool wall()
+{
+  //is mouse at the end of the maze?
+  if ((nextPos[0]==endPos[0])&&(nextPos[1]==endPos[1]))
+    return true;
+  //is the mouse on the linear wall along row 2
+  if (nextPos[1]==1)
+  {
+    if ((nextPos[0]!=0)&&(nextPos[0]!=7))
+      return false;
+  }
+  //is the mouse along the linear wall along row 8
+  if (nextPos[1]==7)
+  {
+    if ((nextPos[0]!=0)&&(nextPos[0]!=7))
+      return false;
+  }
+  //is the mouse in the 2x3 center wall 
+  if ((nextPos[0]==2)||(nextPos[0]==3))
+  {
+    if((nextPos[1]==4)||(nextPos[1]==5)||(nextPos[1]==3)) 
+      return false;
+  //is the mouse at the L bend of the lower wall
+  }
+  if ((nextPos[0]==6)&&(nextPos[1]>4))
+    return false;
+  return true;
+}
+//move the mouse by selecting a random number and iterating based on direction
+//0 ^ (y-)
+//1 -> (x+)
+//2 v (y+)
+//3 <- (x-)
+
+//this sets a potential next move, to be checked by wall and boundary
+int destination()
+{
+  //random(3) doesn't mean 0-3, it only goes 0-2
+  rMove=random(4);
+  if (rMove==0)
+    nextPos[1]--;
+  if (rMove==1)
+    nextPos[0]++;
+  if (rMove==2)
+    nextPos[1]++;
+  if (rMove==3)
+    nextPos[0]--;
+  return rMove;
+}
+//check if the mouse is out of bounds, ie out of the 0-7 coordinate range
+//returning false prevents a move later
+bool boundaryCheck()
+{
+  if ((nextPos[0]>7)||(nextPos[0]<0))
+    return false;
+  if ((nextPos[1]>7)||(nextPos[1]<0))
+    return false;
+  else return true;
+}
+//if a move fails, next position is undone
+void moveFail()
+{
+  nextPos[0]=currentPos[0];
+  nextPos[1]=currentPos[1];
+}
+//if a move succeeds, current position is set to the attempted move
+void moveSuccess()
+{
+  currentPos[0]=nextPos[0];
+  currentPos[1]=nextPos[1];
+}
+//describe mouse movements
+void dialogue()
+{
+  Serial.print("Mouse currently at: ");
+  Serial.print(currentPos[0]);
+  Serial.print(",");
+  Serial.println(currentPos[1]);
+  Serial.print("Mouse goes ");
+  
+  //call a cardinal direction from the character array
+  Serial.print(directions[rMove]);
+  Serial.print(" to: ");
+  Serial.print(nextPos[0]);
+  Serial.print(",");
+  Serial.println(nextPos[1]);
+}
+
+void setup()
+{
+  //using higher baud rate to complete the course faster
+  //in current state the mouse takes 890 moves to complete the course
+  Serial.begin(115200);
+  //seeding but its not very good?
+  randomSeed(millis());
+  i=0;
+  currentPos[0]=startPos[0];
+  currentPos[1]=startPos[1];
+  Serial.print("Mouse Starting at: ");
+  Serial.print(startPos[0]);
+  Serial.print(",");
+  Serial.println(startPos[1]);
+}
+
+void loop()
+{
+  //Serial input snippet for debugging (move by move)
+  //Serial.read();
+  //while (!Serial.available())
+  //  ;
+  
+  //make a move
+  destination();
+  //count the move
+  i++;
+  //check validity and move based on success or failure
+  if ((boundaryCheck())&&(wall()))
+  {
+    //debugging leftover
+    //Serial.println("yes");
+    dialogue();
+    moveSuccess();
+    
+  }
+  else
+  {
+    //debugging leftover
+    //Serial.print("no");
+    dialogue();
+    moveFail();
+    //fail counter for efficiency
+    j++;
+    
+    Serial.println("The move was blocked and no change was made");
+    
+  }
+  //debugging to see if the end condition works
+  //currentPos[0]=endPos[0];
+  //currentPos[1]=endPos[1];
+  
+  //end condition check: if successful move to end pos then - 
+  if ((currentPos[0]==endPos[0])&&(currentPos[1]==endPos[1]))
+  {
+    //Completion announcement, move details, efficiency calc
+    Serial.println("The mouse completed the maze");
+    Serial.print(i);
+    Serial.println(" moves were made.");
+    Serial.print("Efficiency: ");
+    eff = (100*float(i)/float(i+j));
+    Serial.print(eff);
+    Serial.println("%");
+    //user given the option to put in new info
+    Serial.println("Enter new start/end coordinates? (ssee)");
+    //clear the buffer and wait for input
+    Serial.read();
+    while (!Serial.available())
+      ;
+
+    startNend = Serial.parseInt();
+    //4 digit integer divided and the remainder is used for coord
+    //based on place in digit
+    startPos[0] = (startNend / 1000) % 10;
+  	startPos[1] = (startNend / 100) % 10;
+  	endPos[0]   = (startNend / 10) % 10;
+  	endPos[1]   = startNend % 10;
+    
+    //describe new start
+    Serial.print("New Start Position: ");
+    Serial.print(startPos[0]);
+    Serial.print(",");
+    Serial.print(startPos[1]);
+    
+    //describe new end
+    Serial.print("New End Position: ");
+    Serial.print(endPos[0]);
+    Serial.print(",");
+    Serial.print(endPos[1]);
+    
+    //mouse is sent to the new starting position
+    currentPos[0]=startPos[0];
+    currentPos[1]=startPos[1];
+    //steps are reset
+    i = 0;
+    j = 0;
+  }
+  //optional delay but it already takes about 2 minutes to finish without
+  //mouse fairly consistently at 890 steps with 72.42% efficiency in moves
+  //delay(10);
+}
